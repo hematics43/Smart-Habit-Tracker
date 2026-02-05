@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
 <title>Habit Tracker</title>
 
 <style>
@@ -68,7 +67,7 @@ h1 {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #ccc;
-  font-size: 16px; /* prevents zoom */
+  font-size: 16px;
 }
 
 .add button {
@@ -135,16 +134,31 @@ h1 {
   gap: 6px;
 }
 
+/* DAY BOX (SQUARE) */
 .day {
-  aspect-ratio: 1/1;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
+  width: 100%;
+  position: relative;
   cursor: pointer;
   font-weight: 600;
   color: #fff;
   background: var(--red);
-  position: relative;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day::before {
+  content: "";
+  display: block;
+  padding-top: 100%; /* maintains square */
+}
+
+.day > * {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .day.checked {
@@ -185,7 +199,7 @@ h1 {
   border-radius: 10px;
   border: 1px solid #ccc;
   resize: none;
-  font-size: 16px; /* prevents zoom */
+  font-size: 16px;
 }
 
 .modal button {
@@ -255,7 +269,6 @@ h1 {
 let habits = JSON.parse(localStorage.getItem("habits")) || [];
 let currentHabit = null;
 let currentDay = null;
-let pressTimer;
 
 function save() {
   localStorage.setItem("habits", JSON.stringify(habits));
@@ -266,13 +279,15 @@ function addHabit() {
   const days = +document.getElementById("days").value;
   if (!name || !days) return;
 
-  habits.push({
-    name,
-    days,
-    checks: Array(days).fill(false),
-    notes: Array(days).fill("")
-  });
+  // Safari-friendly array creation
+  const checks = [];
+  const notes = [];
+  for(let i=0;i<days;i++){
+    checks.push(false);
+    notes.push("");
+  }
 
+  habits.push({ name, days, checks, notes });
   document.getElementById("name").value = "";
   document.getElementById("days").value = "";
   save();
@@ -308,6 +323,14 @@ function closeInstructions() {
   document.getElementById("helpModal").style.display = "none";
 }
 
+function addLongPress(el, h, d) {
+  let timer;
+  const open = () => openNote(h,d);
+  el.addEventListener("pointerdown", () => timer = setTimeout(open, 600));
+  el.addEventListener("pointerup", () => clearTimeout(timer));
+  el.addEventListener("pointerleave", () => clearTimeout(timer));
+}
+
 function render() {
   const el = document.getElementById("habits");
   el.innerHTML = "";
@@ -316,34 +339,41 @@ function render() {
     const done = h.checks.filter(Boolean).length;
     const pct = Math.round((done / h.days) * 100);
 
-    el.innerHTML += `
-      <div class="habit">
-        <div class="header">
-          <div class="title">${h.name}</div>
-          <div class="delete" onclick="habits.splice(${hi},1);save();render()">✖</div>
-        </div>
-
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="percent">${pct}%</div>
-
-        <div class="days">
-          ${h.checks.map((c, di) => `
-            <div class="day ${c ? "checked":""} ${h.notes[di] ? "has-note":""}"
-              onclick="toggle(${hi},${di})"
-              ontouchstart="pressTimer=setTimeout(()=>openNote(${hi},${di}),600)"
-              ontouchend="clearTimeout(pressTimer)"
-              ondblclick="openNote(${hi},${di})">
-              ${di+1}
-            </div>
-          `).join("")}
-        </div>
+    const habitEl = document.createElement("div");
+    habitEl.className = "habit";
+    habitEl.innerHTML = `
+      <div class="header">
+        <div class="title">${h.name}</div>
+        <div class="delete">✖</div>
       </div>
+      <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="percent">${pct}%</div>
+      <div class="days"></div>
     `;
+    el.appendChild(habitEl);
+
+    habitEl.querySelector(".delete").onclick = () => {
+      habits.splice(hi,1);
+      save();
+      render();
+    };
+
+    const daysDiv = habitEl.querySelector(".days");
+    h.checks.forEach((c, di) => {
+      const day = document.createElement("div");
+      day.className = "day" + (c?" checked":"") + (h.notes[di]?" has-note":"");
+      day.textContent = di+1;
+      day.onclick = () => toggle(hi, di);
+      day.ondblclick = () => openNote(hi, di);
+      addLongPress(day, hi, di);
+      daysDiv.appendChild(day);
+    });
   });
 }
 
+// Close modal on click outside
 document.querySelectorAll(".modal").forEach(m =>
-  m.onclick = e => e.target === m && (m.style.display="none")
+  m.onclick = e => { if(e.target === m) m.style.display="none"; }
 );
 
 render();
