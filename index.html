@@ -39,11 +39,13 @@ h1 {
 /* TOP BAR */
 .top-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   margin-bottom: 12px;
+  gap:6px;
 }
 
-.top-bar button {
+.top-bar button, #importFile {
   padding: 10px 14px;
   border-radius: 10px;
   border: none;
@@ -248,6 +250,8 @@ h1 {
   <div class="top-bar">
     <button onclick="openInstructions()">📘 Instructions</button>
     <button onclick="openTrash()">🗑 Trash</button>
+    <button onclick="exportData()">⬇ Export</button>
+    <input type="file" id="importFile" accept="application/json" onchange="importData(event)">
   </div>
 
   <div class="add">
@@ -256,7 +260,6 @@ h1 {
     <button onclick="addHabit()">Add</button>
   </div>
 
-  <!-- Sorting -->
   <div class="sort-container">
     <label for="sortSelect">Sort by:</label>
     <select id="sortSelect" onchange="render()">
@@ -290,6 +293,7 @@ h1 {
       <li>📝 Long-press or double-tap a day to add a note</li>
       <li>💾 Everything auto-saves</li>
       <li>🗑 Deleted habits go to Trash</li>
+      <li>⬇ Export and 📤 Import JSON backups</li>
       <li>📱 Fully mobile supported</li>
     </ul>
     <button onclick="closeInstructions()">Close</button>
@@ -322,10 +326,7 @@ function addHabit() {
   const days = +document.getElementById("days").value;
   if (!name || !days) return;
 
-  const checks = Array(days).fill(false);
-  const notes = Array(days).fill("");
-
-  habits.push({ name, days, checks, notes });
+  habits.push({ name, days, checks: Array(days).fill(false), notes: Array(days).fill("") });
   document.getElementById("name").value = "";
   document.getElementById("days").value = "";
   save();
@@ -375,10 +376,10 @@ function openTrash() {
   const trashModal = document.getElementById("trashModal");
   const trashList = document.getElementById("trashList");
   trashList.innerHTML = "";
-  if(trash.length === 0){
+  if(trash.length === 0) {
     trashList.textContent = "Trash is empty.";
   } else {
-    trash.forEach((h,i)=>{
+    trash.forEach(h => {
       const div = document.createElement("div");
       div.textContent = `${h.name} (${h.days} days)`;
       trashList.appendChild(div);
@@ -387,14 +388,39 @@ function openTrash() {
   trashModal.style.display = "grid";
 }
 
-function closeTrash() {
-  document.getElementById("trashModal").style.display = "none";
+function closeTrash() { document.getElementById("trashModal").style.display = "none"; }
+function clearTrash() { trash=[]; save(); openTrash(); }
+
+// --- IMPORT / EXPORT ---
+function exportData() {
+  const data = { habits, trash };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'habit-tracker-backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function clearTrash() {
-  trash = [];
-  save();
-  openTrash();
+function importData(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if(data.habits && data.trash){
+        habits = data.habits;
+        trash = data.trash;
+        save();
+        render();
+        alert('Import successful!');
+      } else alert('Invalid JSON file!');
+    } catch(e) { alert('Failed to import: '+e); }
+  };
+  reader.readAsText(file);
+  event.target.value = ""; // reset file input
 }
 
 // --- RENDER ---
@@ -405,20 +431,15 @@ function render() {
   const sortValue = document.getElementById("sortSelect")?.value || "none";
   let sortedHabits = [...habits];
 
-  if(sortValue === "pct-desc") {
-    sortedHabits.sort((a,b) => (b.checks.filter(Boolean).length/a.days) - (a.checks.filter(Boolean).length/b.days));
-  } else if(sortValue === "name-asc") {
-    sortedHabits.sort((a,b) => a.name.localeCompare(b.name));
-  } else if(sortValue === "name-desc") {
-    sortedHabits.sort((a,b) => b.name.localeCompare(a.name));
-  }
+  if(sortValue === "pct-desc") sortedHabits.sort((a,b) => (b.checks.filter(Boolean).length/b.days) - (a.checks.filter(Boolean).length/a.days));
+  else if(sortValue === "name-asc") sortedHabits.sort((a,b) => a.name.localeCompare(b.name));
+  else if(sortValue === "name-desc") sortedHabits.sort((a,b) => b.name.localeCompare(a.name));
 
-  sortedHabits.forEach((h, hi) => {
+  sortedHabits.forEach((h) => {
     const done = h.checks.filter(Boolean).length;
     const pct = Math.round((done / h.days) * 100);
-
     const habitEl = document.createElement("div");
-    habitEl.className = "habit";
+    habitEl.className="habit";
     habitEl.innerHTML = `
       <div class="header">
         <div class="title">${h.name}</div>
@@ -435,7 +456,7 @@ function render() {
     const daysDiv = habitEl.querySelector(".days");
     h.checks.forEach((c, di) => {
       const day = document.createElement("div");
-      day.className = "day" + (c?" checked":"") + (h.notes[di]?" has-note":"");
+      day.className = "day"+(c?" checked":"")+(h.notes[di]?" has-note":"");
       day.textContent = di+1;
       day.onclick = () => toggle(habits.indexOf(h), di);
       day.ondblclick = () => openNote(habits.indexOf(h), di);
@@ -446,9 +467,7 @@ function render() {
 }
 
 // Close modals on outside click
-document.querySelectorAll(".modal").forEach(m =>
-  m.onclick = e => { if(e.target === m) m.style.display="none"; }
-);
+document.querySelectorAll(".modal").forEach(m => m.onclick = e => { if(e.target===m)m.style.display="none"; });
 
 render();
 </script>
