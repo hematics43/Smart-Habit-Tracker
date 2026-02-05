@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi Habit Tracker</title>
+
+<style>
+:root {
+  --green:#4caf50;
+  --red:#e53935;
+  --bg1:#667eea;
+  --bg2:#764ba2;
+  --card:#ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  background: linear-gradient(135deg, var(--bg1), var(--bg2));
+  min-height: 100vh;
+  padding: clamp(12px, 3vw, 24px);
+}
+
+.container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+h1 {
+  text-align: center;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+/* ADD HABIT */
+.add {
+  background: var(--card);
+  padding: 14px;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.add input, .add button {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+}
+
+.add button {
+  background: var(--bg1);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* HABITS GRID */
+.habits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+/* HABIT CARD */
+.habit {
+  background: var(--card);
+  padding: 14px;
+  border-radius: 16px;
+  box-shadow: 0 10px 20px rgba(0,0,0,.15);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.delete {
+  cursor: pointer;
+  color: var(--red);
+  font-size: 18px;
+}
+
+/* PROGRESS */
+.progress {
+  margin: 12px 0;
+}
+
+.bar {
+  background: #ddd;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), #81c784);
+  transition: width .3s ease;
+}
+
+.percent {
+  text-align: right;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* DAYS */
+.days {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.day {
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #fff;
+  background: var(--red);     /* 🔴 NOT DONE */
+  transition: transform .15s ease, background .2s;
+}
+
+.day.checked {
+  background: var(--green);  /* 🟢 DONE */
+}
+
+.day:active {
+  transform: scale(0.95);
+}
+
+/* MOBILE */
+@media (max-width: 500px) {
+  .add {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>🔥 Multi Habit Tracker</h1>
+
+  <div class="add">
+    <input id="name" placeholder="Habit / Event name">
+    <input id="days" type="number" min="1" placeholder="Days">
+    <button onclick="addHabit()">Add</button>
+  </div>
+
+  <div class="habits" id="habits"></div>
+</div>
+
+<script>
+let habits = JSON.parse(localStorage.getItem("habits")) || [];
+
+/* SAVE AUTOMATICALLY */
+function save() {
+  localStorage.setItem("habits", JSON.stringify(habits));
+}
+
+/* ADD HABIT */
+function addHabit() {
+  const name = document.getElementById("name").value.trim();
+  const days = +document.getElementById("days").value;
+
+  if (!name || !days) return;
+
+  habits.push({
+    name,
+    days,
+    checks: Array(days).fill(false)
+  });
+
+  document.getElementById("name").value = "";
+  document.getElementById("days").value = "";
+  save();
+  render();
+}
+
+/* TOGGLE DAY */
+function toggle(habitIndex, dayIndex) {
+  habits[habitIndex].checks[dayIndex] =
+    !habits[habitIndex].checks[dayIndex];
+  save();
+  render();
+}
+
+/* DELETE HABIT */
+function removeHabit(index) {
+  if (!confirm("Delete this habit?")) return;
+  habits.splice(index, 1);
+  save();
+  render();
+}
+
+/* RENDER UI */
+function render() {
+  const container = document.getElementById("habits");
+  container.innerHTML = "";
+
+  habits.forEach((habit, hIndex) => {
+    const done = habit.checks.filter(Boolean).length;
+    const percent = Math.round((done / habit.days) * 100);
+
+    container.innerHTML += `
+      <div class="habit">
+        <div class="header">
+          <div class="title">${habit.name}</div>
+          <div class="delete" onclick="removeHabit(${hIndex})">✖</div>
+        </div>
+
+        <div class="progress">
+          <div class="bar">
+            <div class="fill" style="width:${percent}%"></div>
+          </div>
+          <div class="percent">${percent}% Completed</div>
+        </div>
+
+        <div class="days">
+          ${habit.checks.map((checked, dIndex) => `
+            <div class="day ${checked ? "checked" : ""}"
+                 onclick="toggle(${hIndex}, ${dIndex})">
+              ${dIndex + 1}
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  });
+}
+
+/* LOAD ON START */
+render();
+</script>
+
+</body>
+</html>
