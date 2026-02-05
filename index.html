@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Habit Tracker with Notes</title>
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>Habit Tracker</title>
 
 <style>
 :root {
@@ -32,7 +34,23 @@ body {
 h1 {
   text-align: center;
   color: #fff;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+}
+
+/* TOP BAR */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.top-bar button {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #fff;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 /* ADD HABIT */
@@ -50,22 +68,23 @@ h1 {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #ccc;
+  font-size: 16px; /* prevents zoom */
 }
 
 .add button {
   background: var(--bg1);
   color: white;
   border: none;
-  cursor: pointer;
 }
 
-/* HABITS */
+/* HABITS GRID */
 .habits {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
 }
 
+/* HABIT CARD */
 .habit {
   background: var(--card);
   padding: 14px;
@@ -91,15 +110,12 @@ h1 {
 }
 
 /* PROGRESS */
-.progress {
-  margin: 12px 0;
-}
-
 .bar {
-  height: 10px;
   background: #ddd;
+  height: 10px;
   border-radius: 5px;
   overflow: hidden;
+  margin: 10px 0 4px;
 }
 
 .fill {
@@ -135,7 +151,6 @@ h1 {
   background: var(--green);
 }
 
-/* NOTE INDICATOR */
 .day.has-note::after {
   content: "📝";
   position: absolute;
@@ -144,11 +159,11 @@ h1 {
   font-size: 12px;
 }
 
-/* NOTE MODAL */
+/* MODALS */
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.5);
+  background: rgba(0,0,0,.55);
   display: none;
   place-items: center;
   z-index: 10;
@@ -158,29 +173,33 @@ h1 {
   background: #fff;
   padding: 16px;
   border-radius: 14px;
-  width: min(90%, 400px);
+  width: min(92%, 420px);
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .modal textarea {
   width: 100%;
   height: 120px;
-  padding: 10px;
+  padding: 12px;
   border-radius: 10px;
   border: 1px solid #ccc;
   resize: none;
+  font-size: 16px; /* prevents zoom */
 }
 
 .modal button {
   margin-top: 10px;
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border-radius: 10px;
   border: none;
   background: var(--bg1);
   color: white;
-  cursor: pointer;
+  font-size: 16px;
 }
 
+/* MOBILE */
 @media (max-width: 500px) {
   .add {
     grid-template-columns: 1fr;
@@ -192,7 +211,11 @@ h1 {
 <body>
 
 <div class="container">
-  <h1>🔥 Habit Tracker (with Notes)</h1>
+  <h1>🔥 Habit Tracker</h1>
+
+  <div class="top-bar">
+    <button onclick="openInstructions()">📘 Instructions</button>
+  </div>
 
   <div class="add">
     <input id="name" placeholder="Habit name">
@@ -204,11 +227,27 @@ h1 {
 </div>
 
 <!-- NOTE MODAL -->
-<div class="modal" id="modal">
+<div class="modal" id="noteModal">
   <div class="modal-content">
     <h3>Day Note</h3>
     <textarea id="noteText" placeholder="Write your note..."></textarea>
-    <button onclick="saveNote()">Save Note</button>
+    <button onclick="saveNote()">Save</button>
+  </div>
+</div>
+
+<!-- INSTRUCTIONS MODAL -->
+<div class="modal" id="helpModal">
+  <div class="modal-content">
+    <h3>📘 How to Use</h3>
+    <ul>
+      <li>➕ Add multiple habits/events</li>
+      <li>🟢 Green = Done, 🔴 Red = Not Done</li>
+      <li>👆 Tap a day to mark done</li>
+      <li>📝 Long-press or double-tap a day to add a note</li>
+      <li>💾 Everything auto-saves</li>
+      <li>📱 Fully mobile supported</li>
+    </ul>
+    <button onclick="closeInstructions()">Close</button>
   </div>
 </div>
 
@@ -216,6 +255,7 @@ h1 {
 let habits = JSON.parse(localStorage.getItem("habits")) || [];
 let currentHabit = null;
 let currentDay = null;
+let pressTimer;
 
 function save() {
   localStorage.setItem("habits", JSON.stringify(habits));
@@ -248,24 +288,24 @@ function toggle(h, d) {
 function openNote(h, d) {
   currentHabit = h;
   currentDay = d;
-  document.getElementById("noteText").value =
-    habits[h].notes[d] || "";
-  document.getElementById("modal").style.display = "grid";
+  document.getElementById("noteText").value = habits[h].notes[d];
+  document.getElementById("noteModal").style.display = "grid";
 }
 
 function saveNote() {
   habits[currentHabit].notes[currentDay] =
     document.getElementById("noteText").value;
-  document.getElementById("modal").style.display = "none";
+  document.getElementById("noteModal").style.display = "none";
   save();
   render();
 }
 
-function removeHabit(i) {
-  if (!confirm("Delete habit?")) return;
-  habits.splice(i, 1);
-  save();
-  render();
+function openInstructions() {
+  document.getElementById("helpModal").style.display = "grid";
+}
+
+function closeInstructions() {
+  document.getElementById("helpModal").style.display = "none";
 }
 
 function render() {
@@ -280,32 +320,31 @@ function render() {
       <div class="habit">
         <div class="header">
           <div class="title">${h.name}</div>
-          <div class="delete" onclick="removeHabit(${hi})">✖</div>
+          <div class="delete" onclick="habits.splice(${hi},1);save();render()">✖</div>
         </div>
 
-        <div class="progress">
-          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-          <div class="percent">${pct}%</div>
-        </div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="percent">${pct}%</div>
 
         <div class="days">
           ${h.checks.map((c, di) => `
             <div class="day ${c ? "checked":""} ${h.notes[di] ? "has-note":""}"
               onclick="toggle(${hi},${di})"
+              ontouchstart="pressTimer=setTimeout(()=>openNote(${hi},${di}),600)"
+              ontouchend="clearTimeout(pressTimer)"
               ondblclick="openNote(${hi},${di})">
               ${di+1}
             </div>
           `).join("")}
         </div>
-        <small>Tip: double-click / long-press day to add note</small>
       </div>
     `;
   });
 }
 
-document.getElementById("modal").onclick = e => {
-  if (e.target.id === "modal") e.target.style.display = "none";
-};
+document.querySelectorAll(".modal").forEach(m =>
+  m.onclick = e => e.target === m && (m.style.display="none")
+);
 
 render();
 </script>
