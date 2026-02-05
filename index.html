@@ -247,6 +247,7 @@ h1 {
 
   <div class="top-bar">
     <button onclick="openInstructions()">📘 Instructions</button>
+    <button onclick="openTrash()">🗑 Trash</button>
   </div>
 
   <div class="add">
@@ -288,18 +289,32 @@ h1 {
       <li>👆 Tap a day to mark done</li>
       <li>📝 Long-press or double-tap a day to add a note</li>
       <li>💾 Everything auto-saves</li>
+      <li>🗑 Deleted habits go to Trash</li>
+      <li>📱 Fully mobile supported</li>
     </ul>
     <button onclick="closeInstructions()">Close</button>
   </div>
 </div>
 
+<!-- TRASH MODAL -->
+<div class="modal" id="trashModal">
+  <div class="modal-content">
+    <h3>🗑 Trash</h3>
+    <div id="trashList" style="margin-bottom:10px;"></div>
+    <button onclick="clearTrash()">Clear Trash</button>
+    <button onclick="closeTrash()" style="margin-top:6px;">Close</button>
+  </div>
+</div>
+
 <script>
 let habits = JSON.parse(localStorage.getItem("habits")) || [];
+let trash = JSON.parse(localStorage.getItem("trash")) || [];
 let currentHabit = null;
 let currentDay = null;
 
 function save() {
   localStorage.setItem("habits", JSON.stringify(habits));
+  localStorage.setItem("trash", JSON.stringify(trash));
 }
 
 function addHabit() {
@@ -307,12 +322,8 @@ function addHabit() {
   const days = +document.getElementById("days").value;
   if (!name || !days) return;
 
-  const checks = [];
-  const notes = [];
-  for(let i=0;i<days;i++){
-    checks.push(false);
-    notes.push("");
-  }
+  const checks = Array(days).fill(false);
+  const notes = Array(days).fill("");
 
   habits.push({ name, days, checks, notes });
   document.getElementById("name").value = "";
@@ -335,20 +346,14 @@ function openNote(h, d) {
 }
 
 function saveNote() {
-  habits[currentHabit].notes[currentDay] =
-    document.getElementById("noteText").value;
+  habits[currentHabit].notes[currentDay] = document.getElementById("noteText").value;
   document.getElementById("noteModal").style.display = "none";
   save();
   render();
 }
 
-function openInstructions() {
-  document.getElementById("helpModal").style.display = "grid";
-}
-
-function closeInstructions() {
-  document.getElementById("helpModal").style.display = "none";
-}
+function openInstructions() { document.getElementById("helpModal").style.display = "grid"; }
+function closeInstructions() { document.getElementById("helpModal").style.display = "none"; }
 
 function addLongPress(el, h, d) {
   let timer;
@@ -358,6 +363,41 @@ function addLongPress(el, h, d) {
   el.addEventListener("pointerleave", () => clearTimeout(timer));
 }
 
+// --- TRASH ---
+function deleteHabit(hIndex) {
+  trash.push(habits[hIndex]);
+  habits.splice(hIndex,1);
+  save();
+  render();
+}
+
+function openTrash() {
+  const trashModal = document.getElementById("trashModal");
+  const trashList = document.getElementById("trashList");
+  trashList.innerHTML = "";
+  if(trash.length === 0){
+    trashList.textContent = "Trash is empty.";
+  } else {
+    trash.forEach((h,i)=>{
+      const div = document.createElement("div");
+      div.textContent = `${h.name} (${h.days} days)`;
+      trashList.appendChild(div);
+    });
+  }
+  trashModal.style.display = "grid";
+}
+
+function closeTrash() {
+  document.getElementById("trashModal").style.display = "none";
+}
+
+function clearTrash() {
+  trash = [];
+  save();
+  openTrash();
+}
+
+// --- RENDER ---
 function render() {
   const el = document.getElementById("habits");
   el.innerHTML = "";
@@ -390,14 +430,7 @@ function render() {
     `;
     el.appendChild(habitEl);
 
-    habitEl.querySelector(".delete").onclick = () => {
-      const origIndex = habits.indexOf(h);
-      if(origIndex > -1) {
-        habits.splice(origIndex,1);
-        save();
-        render();
-      }
-    };
+    habitEl.querySelector(".delete").onclick = () => deleteHabit(habits.indexOf(h));
 
     const daysDiv = habitEl.querySelector(".days");
     h.checks.forEach((c, di) => {
@@ -412,13 +445,12 @@ function render() {
   });
 }
 
-// Close modal on click outside
+// Close modals on outside click
 document.querySelectorAll(".modal").forEach(m =>
   m.onclick = e => { if(e.target === m) m.style.display="none"; }
 );
 
 render();
 </script>
-
 </body>
 </html>
