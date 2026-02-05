@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Multi Habit Tracker</title>
+<title>Habit Tracker with Notes</title>
 
 <style>
 :root {
@@ -14,16 +14,14 @@
   --card:#ffffff;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  font-family: system-ui;
   background: linear-gradient(135deg, var(--bg1), var(--bg2));
   min-height: 100vh;
-  padding: clamp(12px, 3vw, 24px);
+  padding: 16px;
 }
 
 .container {
@@ -52,7 +50,6 @@ h1 {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid #ccc;
-  font-size: 16px;
 }
 
 .add button {
@@ -62,14 +59,13 @@ h1 {
   cursor: pointer;
 }
 
-/* HABITS GRID */
+/* HABITS */
 .habits {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 18px;
 }
 
-/* HABIT CARD */
 .habit {
   background: var(--card);
   padding: 14px;
@@ -100,8 +96,8 @@ h1 {
 }
 
 .bar {
-  background: #ddd;
   height: 10px;
+  background: #ddd;
   border-radius: 5px;
   overflow: hidden;
 }
@@ -109,13 +105,11 @@ h1 {
 .fill {
   height: 100%;
   background: linear-gradient(90deg, var(--green), #81c784);
-  transition: width .3s ease;
 }
 
 .percent {
   text-align: right;
   font-size: 14px;
-  margin-top: 4px;
 }
 
 /* DAYS */
@@ -123,30 +117,70 @@ h1 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
   gap: 6px;
-  margin-top: 10px;
 }
 
 .day {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1/1;
   display: grid;
   place-items: center;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   color: #fff;
-  background: var(--red);     /* 🔴 NOT DONE */
-  transition: transform .15s ease, background .2s;
+  background: var(--red);
+  position: relative;
 }
 
 .day.checked {
-  background: var(--green);  /* 🟢 DONE */
+  background: var(--green);
 }
 
-.day:active {
-  transform: scale(0.95);
+/* NOTE INDICATOR */
+.day.has-note::after {
+  content: "📝";
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 12px;
 }
 
-/* MOBILE */
+/* NOTE MODAL */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  display: none;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 16px;
+  border-radius: 14px;
+  width: min(90%, 400px);
+}
+
+.modal textarea {
+  width: 100%;
+  height: 120px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  resize: none;
+}
+
+.modal button {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: var(--bg1);
+  color: white;
+  cursor: pointer;
+}
+
 @media (max-width: 500px) {
   .add {
     grid-template-columns: 1fr;
@@ -158,10 +192,10 @@ h1 {
 <body>
 
 <div class="container">
-  <h1>🔥 Multi Habit Tracker</h1>
+  <h1>🔥 Habit Tracker (with Notes)</h1>
 
   <div class="add">
-    <input id="name" placeholder="Habit / Event name">
+    <input id="name" placeholder="Habit name">
     <input id="days" type="number" min="1" placeholder="Days">
     <button onclick="addHabit()">Add</button>
   </div>
@@ -169,25 +203,34 @@ h1 {
   <div class="habits" id="habits"></div>
 </div>
 
+<!-- NOTE MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3>Day Note</h3>
+    <textarea id="noteText" placeholder="Write your note..."></textarea>
+    <button onclick="saveNote()">Save Note</button>
+  </div>
+</div>
+
 <script>
 let habits = JSON.parse(localStorage.getItem("habits")) || [];
+let currentHabit = null;
+let currentDay = null;
 
-/* SAVE AUTOMATICALLY */
 function save() {
   localStorage.setItem("habits", JSON.stringify(habits));
 }
 
-/* ADD HABIT */
 function addHabit() {
   const name = document.getElementById("name").value.trim();
   const days = +document.getElementById("days").value;
-
   if (!name || !days) return;
 
   habits.push({
     name,
     days,
-    checks: Array(days).fill(false)
+    checks: Array(days).fill(false),
+    notes: Array(days).fill("")
   });
 
   document.getElementById("name").value = "";
@@ -196,59 +239,74 @@ function addHabit() {
   render();
 }
 
-/* TOGGLE DAY */
-function toggle(habitIndex, dayIndex) {
-  habits[habitIndex].checks[dayIndex] =
-    !habits[habitIndex].checks[dayIndex];
+function toggle(h, d) {
+  habits[h].checks[d] = !habits[h].checks[d];
   save();
   render();
 }
 
-/* DELETE HABIT */
-function removeHabit(index) {
-  if (!confirm("Delete this habit?")) return;
-  habits.splice(index, 1);
+function openNote(h, d) {
+  currentHabit = h;
+  currentDay = d;
+  document.getElementById("noteText").value =
+    habits[h].notes[d] || "";
+  document.getElementById("modal").style.display = "grid";
+}
+
+function saveNote() {
+  habits[currentHabit].notes[currentDay] =
+    document.getElementById("noteText").value;
+  document.getElementById("modal").style.display = "none";
   save();
   render();
 }
 
-/* RENDER UI */
+function removeHabit(i) {
+  if (!confirm("Delete habit?")) return;
+  habits.splice(i, 1);
+  save();
+  render();
+}
+
 function render() {
-  const container = document.getElementById("habits");
-  container.innerHTML = "";
+  const el = document.getElementById("habits");
+  el.innerHTML = "";
 
-  habits.forEach((habit, hIndex) => {
-    const done = habit.checks.filter(Boolean).length;
-    const percent = Math.round((done / habit.days) * 100);
+  habits.forEach((h, hi) => {
+    const done = h.checks.filter(Boolean).length;
+    const pct = Math.round((done / h.days) * 100);
 
-    container.innerHTML += `
+    el.innerHTML += `
       <div class="habit">
         <div class="header">
-          <div class="title">${habit.name}</div>
-          <div class="delete" onclick="removeHabit(${hIndex})">✖</div>
+          <div class="title">${h.name}</div>
+          <div class="delete" onclick="removeHabit(${hi})">✖</div>
         </div>
 
         <div class="progress">
-          <div class="bar">
-            <div class="fill" style="width:${percent}%"></div>
-          </div>
-          <div class="percent">${percent}% Completed</div>
+          <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+          <div class="percent">${pct}%</div>
         </div>
 
         <div class="days">
-          ${habit.checks.map((checked, dIndex) => `
-            <div class="day ${checked ? "checked" : ""}"
-                 onclick="toggle(${hIndex}, ${dIndex})">
-              ${dIndex + 1}
+          ${h.checks.map((c, di) => `
+            <div class="day ${c ? "checked":""} ${h.notes[di] ? "has-note":""}"
+              onclick="toggle(${hi},${di})"
+              ondblclick="openNote(${hi},${di})">
+              ${di+1}
             </div>
           `).join("")}
         </div>
+        <small>Tip: double-click / long-press day to add note</small>
       </div>
     `;
   });
 }
 
-/* LOAD ON START */
+document.getElementById("modal").onclick = e => {
+  if (e.target.id === "modal") e.target.style.display = "none";
+};
+
 render();
 </script>
 
