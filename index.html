@@ -76,6 +76,24 @@ h1 {
   border: none;
 }
 
+/* SORT DROPDOWN */
+.sort-container {
+  margin-bottom: 12px;
+}
+
+.sort-container label {
+  color: #fff;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.sort-container select {
+  padding:6px 10px;
+  border-radius:6px;
+  border:none;
+  font-size:16px;
+}
+
 /* HABITS GRID */
 .habits {
   display: grid;
@@ -237,6 +255,17 @@ h1 {
     <button onclick="addHabit()">Add</button>
   </div>
 
+  <!-- Sorting -->
+  <div class="sort-container">
+    <label for="sortSelect">Sort by:</label>
+    <select id="sortSelect" onchange="render()">
+      <option value="none">None</option>
+      <option value="pct-desc">Completion % ↓</option>
+      <option value="name-asc">Name A→Z</option>
+      <option value="name-desc">Name Z→A</option>
+    </select>
+  </div>
+
   <div class="habits" id="habits"></div>
 </div>
 
@@ -259,7 +288,6 @@ h1 {
       <li>👆 Tap a day to mark done</li>
       <li>📝 Long-press or double-tap a day to add a note</li>
       <li>💾 Everything auto-saves</li>
-      <li>📱 Fully mobile supported</li>
     </ul>
     <button onclick="closeInstructions()">Close</button>
   </div>
@@ -279,7 +307,6 @@ function addHabit() {
   const days = +document.getElementById("days").value;
   if (!name || !days) return;
 
-  // Safari-friendly array creation
   const checks = [];
   const notes = [];
   for(let i=0;i<days;i++){
@@ -335,7 +362,18 @@ function render() {
   const el = document.getElementById("habits");
   el.innerHTML = "";
 
-  habits.forEach((h, hi) => {
+  const sortValue = document.getElementById("sortSelect")?.value || "none";
+  let sortedHabits = [...habits];
+
+  if(sortValue === "pct-desc") {
+    sortedHabits.sort((a,b) => (b.checks.filter(Boolean).length/a.days) - (a.checks.filter(Boolean).length/b.days));
+  } else if(sortValue === "name-asc") {
+    sortedHabits.sort((a,b) => a.name.localeCompare(b.name));
+  } else if(sortValue === "name-desc") {
+    sortedHabits.sort((a,b) => b.name.localeCompare(a.name));
+  }
+
+  sortedHabits.forEach((h, hi) => {
     const done = h.checks.filter(Boolean).length;
     const pct = Math.round((done / h.days) * 100);
 
@@ -353,9 +391,12 @@ function render() {
     el.appendChild(habitEl);
 
     habitEl.querySelector(".delete").onclick = () => {
-      habits.splice(hi,1);
-      save();
-      render();
+      const origIndex = habits.indexOf(h);
+      if(origIndex > -1) {
+        habits.splice(origIndex,1);
+        save();
+        render();
+      }
     };
 
     const daysDiv = habitEl.querySelector(".days");
@@ -363,9 +404,9 @@ function render() {
       const day = document.createElement("div");
       day.className = "day" + (c?" checked":"") + (h.notes[di]?" has-note":"");
       day.textContent = di+1;
-      day.onclick = () => toggle(hi, di);
-      day.ondblclick = () => openNote(hi, di);
-      addLongPress(day, hi, di);
+      day.onclick = () => toggle(habits.indexOf(h), di);
+      day.ondblclick = () => openNote(habits.indexOf(h), di);
+      addLongPress(day, habits.indexOf(h), di);
       daysDiv.appendChild(day);
     });
   });
